@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity
 @Table(name = "movimientos")
 @Data
@@ -21,6 +23,7 @@ public class Movimiento {
     
     @ManyToOne
     @JoinColumn(name = "idusuario", nullable = false)
+    @JsonIgnoreProperties({"contrasena"}) 
     private Usuario usuario;
     
     @Column(nullable = false)

@@ -105,6 +105,16 @@ public class UsuarioController {
         Usuario usuario = usuarioRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         
+        if (request.getUsuario() != null && !request.getUsuario().isEmpty()) {
+            // Verificar que el nuevo username no esté en uso
+            if (usuarioRepository.existsByUsuario(request.getUsuario()) && 
+                !usuario.getUsuario().equals(request.getUsuario())) {
+                return ResponseEntity.badRequest()
+                    .body(new MessageResponse("El nombre de usuario ya está en uso"));
+            }
+            usuario.setUsuario(request.getUsuario());
+        }
+        
         usuario.setNombre(request.getNombre());
         usuario.setNivel(request.getNivel());
         usuario.setActivo(request.getActivo());

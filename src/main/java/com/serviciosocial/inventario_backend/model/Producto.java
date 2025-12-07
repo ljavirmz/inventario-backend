@@ -29,11 +29,11 @@ public class Producto {
     @JoinColumn(name = "idmarca", nullable = false)
     private Marca marca;
     
-    @Column(name = "noserie", unique = true)
-    private Long noSerie;
+    @Column(name = "noserie", unique = true, length = 100)
+    private String noSerie;
     
-    @Column(name = "noinv", nullable = false, unique = true)
-    private Long noInv;
+    @Column(name = "noinv", nullable = false, unique = true, length = 100)
+    private String noInv;
     
     @ManyToOne
     @JoinColumn(name = "idestado", nullable = false)

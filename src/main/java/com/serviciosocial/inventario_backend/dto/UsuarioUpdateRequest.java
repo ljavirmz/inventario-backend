@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioUpdateRequest {
+	private String usuario; 
     private String nombre;
     private String contrasena; // Opcional
     private Integer nivel;

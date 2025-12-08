@@ -32,8 +32,8 @@ public class Producto {
     @Column(name = "noserie", unique = true, length = 100)
     private String noSerie;
     
-    @Column(name = "noinv", nullable = false, unique = true, length = 100)
-    private String noInv;
+    @Column(name = "noinv", unique = true, length = 100)
+    private String noInv; 
     
     @ManyToOne
     @JoinColumn(name = "idestado", nullable = false)

@@ -52,4 +52,21 @@ public class MovimientoService {
             .filter(m -> m.getAccion().equalsIgnoreCase(accion))
             .toList();
     }
+    
+    public Page<Movimiento> obtenerTodosPaginadosPorUsuario(Long idUsuario, Pageable pageable) {
+        // Implementación simple: obtener todos y filtrar
+        // Para mejor rendimiento, deberías crear un método en el repository
+        List<Movimiento> movimientos = movimientoRepository.findAll().stream()
+            .filter(m -> m.getUsuario().getIdUsuario().equals(idUsuario))
+            .toList();
+        
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), movimientos.size());
+        
+        return new org.springframework.data.domain.PageImpl<>(
+            movimientos.subList(start, end),
+            pageable,
+            movimientos.size()
+        );
+    }
 }

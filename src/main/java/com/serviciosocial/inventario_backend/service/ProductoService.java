@@ -52,6 +52,20 @@ public class ProductoService {
     
     @Transactional
     public Producto crear(ProductoRequest request, String usuarioActual) {
+        // Validar número de inventario único (solo si viene)
+        if (request.getNoInv() != null && !request.getNoInv().isEmpty()) {
+            if (productoRepository.existsByNoInv(request.getNoInv())) {
+                throw new RuntimeException("El número de inventario '" + request.getNoInv() + "' ya existe");
+            }
+        }
+        
+        // Validar número de serie único (solo si viene)
+        if (request.getNoSerie() != null && !request.getNoSerie().isEmpty()) {
+            if (productoRepository.existsByNoSerie(request.getNoSerie())) {
+                throw new RuntimeException("El número de serie '" + request.getNoSerie() + "' ya está registrado. El producto ya existe en el sistema.");
+            }
+        }
+        
         // Validar que existan las entidades relacionadas
         Area area = areaRepository.findById(request.getIdArea())
             .orElseThrow(() -> new RuntimeException("Área no encontrada"));
@@ -76,10 +90,11 @@ public class ProductoService {
         producto = productoRepository.save(producto);
         
         // Registrar movimiento
+        String detalleInv = producto.getNoInv() != null ? " (Inv: " + producto.getNoInv() + ")" : " (Sin No. Inv)";
         registrarMovimiento(
             usuarioActual,
             "INSERT",
-            "Producto creado: " + producto.getModelo() + " (Inv: " + producto.getNoInv() + ")",
+            "Producto creado: " + producto.getModelo() + detalleInv,
             "Productos",
             producto.getIdProducto()
         );
@@ -94,6 +109,22 @@ public class ProductoService {
         String detallesAntes = "Modelo: " + producto.getModelo() + 
                               ", Estado: " + producto.getEstado().getNombre() +
                               ", Área: " + producto.getArea().getNombre();
+        
+        // Validar número de inventario único (si se está cambiando y viene)
+        if (request.getNoInv() != null && !request.getNoInv().isEmpty() && 
+            !request.getNoInv().equals(producto.getNoInv())) {
+            if (productoRepository.existsByNoInv(request.getNoInv())) {
+                throw new RuntimeException("El número de inventario '" + request.getNoInv() + "' ya existe");
+            }
+        }
+        
+        // Validar número de serie único (si se está cambiando y viene)
+        if (request.getNoSerie() != null && !request.getNoSerie().isEmpty() && 
+            !request.getNoSerie().equals(producto.getNoSerie())) {
+            if (productoRepository.existsByNoSerie(request.getNoSerie())) {
+                throw new RuntimeException("El número de serie '" + request.getNoSerie() + "' ya está registrado");
+            }
+        }
         
         // Actualizar relaciones
         if (request.getIdArea() != null) {

@@ -6,6 +6,7 @@ import com.serviciosocial.inventario_backend.model.*;
 import com.serviciosocial.inventario_backend.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -187,21 +188,38 @@ public class ProductoService {
     public void darDeBaja(Long id, ProductoBajaRequest request, String usuarioActual) {
         Producto producto = obtenerPorId(id);
         
-        // Buscar el estado "Dado de Baja"
-        Estado estadoBaja = estadoRepository.findAll().stream()
-            .filter(e -> e.getNombre().equalsIgnoreCase("Dado de Baja"))
-            .findFirst()
-            .orElseThrow(() -> new RuntimeException("Estado 'Dado de Baja' no encontrado"));
-        
-        producto.setEstado(estadoBaja);
+        // Simplemente desactivar el producto (borrado lógico)
+        producto.setActivo(false);
         productoRepository.save(producto);
         
-        // Registrar movimiento con motivo
+        // Registrar movimiento como BAJA con el motivo
         registrarMovimiento(
             usuarioActual,
-            "DELETE",
+            "BAJA",
             "Producto dado de baja. Motivo: " + request.getMotivo() + 
-            " - Producto: " + producto.getModelo() + " (Inv: " + producto.getNoInv() + ")",
+            " - Producto: " + producto.getModelo() + 
+            (producto.getNoInv() != null ? " (Inv: " + producto.getNoInv() + ")" : ""),
+            "Productos",
+            producto.getIdProducto()
+        );
+    }
+    
+    @Transactional
+    public void reactivar(Long id, String usuarioActual) {
+        Producto producto = obtenerPorId(id);
+        
+        if (producto.getActivo()) {
+            throw new RuntimeException("El producto ya está activo");
+        }
+        
+        producto.setActivo(true);
+        productoRepository.save(producto);
+        
+        registrarMovimiento(
+            usuarioActual,
+            "REACTIVACION",
+            "Producto reactivado: " + producto.getModelo() + 
+            (producto.getNoInv() != null ? " (Inv: " + producto.getNoInv() + ")" : ""),
             "Productos",
             producto.getIdProducto()
         );
@@ -243,5 +261,32 @@ public class ProductoService {
         return productoRepository.findAll().stream()
             .filter(p -> p.getEstado().getIdEstado().equals(idEstado))
             .toList();
+    }
+    
+    public List<Producto> obtenerActivos() {
+        return productoRepository.findAll().stream()
+            .filter(Producto::getActivo)
+            .toList();
+    }
+
+    public List<Producto> obtenerInactivos() {
+        return productoRepository.findAll().stream()
+            .filter(p -> !p.getActivo())
+            .toList();
+    }
+
+    public Page<Producto> obtenerActivosPaginados(Pageable pageable) {
+        List<Producto> activos = productoRepository.findAll().stream()
+            .filter(Producto::getActivo)
+            .toList();
+        
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), activos.size());
+        
+        return new PageImpl<>(
+            activos.subList(start, end),
+            pageable,
+            activos.size()
+        );
     }
 }

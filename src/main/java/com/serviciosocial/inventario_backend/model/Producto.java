@@ -44,4 +44,7 @@ public class Producto {
     
     @Column
     private String foto;
+    
+    @Column(nullable = false)
+    private Boolean activo = true;
 }

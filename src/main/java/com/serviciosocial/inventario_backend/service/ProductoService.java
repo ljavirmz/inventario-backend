@@ -188,16 +188,24 @@ public class ProductoService {
     public void darDeBaja(Long id, ProductoBajaRequest request, String usuarioActual) {
         Producto producto = obtenerPorId(id);
         
-        // Simplemente desactivar el producto (borrado lógico)
+        // Buscar el estado "Dado de Baja"
+        Estado estadoDadoDeBaja = estadoRepository.findAll().stream()
+            .filter(e -> e.getNombre().equalsIgnoreCase("Dado de Baja"))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Estado 'Dado de Baja' no encontrado en catálogo"));
+        
+        // Desactivar el producto y cambiar su estado a "Dado de Baja"
         producto.setActivo(false);
+        producto.setEstado(estadoDadoDeBaja);
         productoRepository.save(producto);
         
-        // Registrar movimiento como BAJA con el motivo
+        // Registrar movimiento
         registrarMovimiento(
             usuarioActual,
             "BAJA",
             "Producto dado de baja. Motivo: " + request.getMotivo() + 
             " - Producto: " + producto.getModelo() + 
+            " - Estado cambiado a 'Dado de Baja'" +
             (producto.getNoInv() != null ? " (Inv: " + producto.getNoInv() + ")" : ""),
             "Productos",
             producto.getIdProducto()
@@ -212,13 +220,22 @@ public class ProductoService {
             throw new RuntimeException("El producto ya está activo");
         }
         
+        // Buscar el estado "Funcional"
+        Estado estadoFuncional = estadoRepository.findAll().stream()
+            .filter(e -> e.getNombre().equalsIgnoreCase("Funcional"))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Estado 'Funcional' no encontrado en catálogo"));
+        
+        // Reactivar el producto y cambiar su estado a "Funcional"
         producto.setActivo(true);
+        producto.setEstado(estadoFuncional);
         productoRepository.save(producto);
         
         registrarMovimiento(
             usuarioActual,
             "REACTIVACION",
             "Producto reactivado: " + producto.getModelo() + 
+            " - Estado cambiado a 'Funcional'" +
             (producto.getNoInv() != null ? " (Inv: " + producto.getNoInv() + ")" : ""),
             "Productos",
             producto.getIdProducto()

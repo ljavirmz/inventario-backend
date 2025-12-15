@@ -7,6 +7,7 @@ import com.serviciosocial.inventario_backend.model.Producto;
 import com.serviciosocial.inventario_backend.model.Usuario;
 import com.serviciosocial.inventario_backend.repository.ProductoRepository;
 import com.serviciosocial.inventario_backend.repository.UsuarioRepository;
+import com.serviciosocial.inventario_backend.service.CloudinaryService;
 import com.serviciosocial.inventario_backend.service.ProductoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.Map;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 
 @RestController
@@ -31,6 +36,9 @@ public class ProductoController {
     
     @Autowired
     private ProductoRepository productoRepository;
+    
+    @Autowired
+    private CloudinaryService cloudinaryService;
     
     @GetMapping
     public ResponseEntity<List<Producto>> obtenerTodos() {
@@ -109,10 +117,39 @@ public class ProductoController {
     }
     
     @PostMapping
-    public ResponseEntity<?> crear(@RequestBody ProductoRequest request) {
+    public ResponseEntity<?> crear(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam("idArea") Long idArea,
+            @RequestParam("idCategoria") Long idCategoria,
+            @RequestParam("idMarca") Long idMarca,
+            @RequestParam(value = "noSerie", required = false) String noSerie,
+            @RequestParam(value = "noInv", required = false) String noInv,
+            @RequestParam("idEstado") Long idEstado,
+            @RequestParam("modelo") String modelo) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String usuarioActual = authentication.getName();
+            
+            // Subir imagen a Cloudinary si viene
+            String fotoUrl = null;
+            if (file != null && !file.isEmpty()) {
+                fotoUrl = cloudinaryService.subirImagen(file);
+            }
+            
+            // Convertir cadenas vacías a null
+            String noSerieNormalizado = (noSerie != null && noSerie.trim().isEmpty()) ? null : noSerie;
+            String noInvNormalizado = (noInv != null && noInv.trim().isEmpty()) ? null : noInv;
+            
+            // Crear request
+            ProductoRequest request = new ProductoRequest();
+            request.setIdArea(idArea);
+            request.setIdCategoria(idCategoria);
+            request.setIdMarca(idMarca);
+            request.setNoSerie(noSerieNormalizado);
+            request.setNoInv(noInvNormalizado);
+            request.setIdEstado(idEstado);
+            request.setModelo(modelo);
+            request.setFoto(fotoUrl);
             
             Producto producto = productoService.crear(request, usuarioActual);
             return ResponseEntity.ok(producto);
@@ -123,11 +160,57 @@ public class ProductoController {
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizar(@PathVariable Long id, 
-                                       @RequestBody ProductoRequest request) {
+    public ResponseEntity<?> actualizar(
+            @PathVariable Long id,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "idArea", required = false) Long idArea,
+            @RequestParam(value = "idCategoria", required = false) Long idCategoria,
+            @RequestParam(value = "idMarca", required = false) Long idMarca,
+            @RequestParam(value = "noSerie", required = false) String noSerie,
+            @RequestParam(value = "noInv", required = false) String noInv,
+            @RequestParam(value = "idEstado", required = false) Long idEstado,
+            @RequestParam(value = "modelo", required = false) String modelo) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String usuarioActual = authentication.getName();
+            
+            // Obtener producto actual para acceder a la foto vieja
+            Producto productoExistente = productoService.obtenerPorId(id);
+            String fotoViejaUrl = productoExistente.getFoto();
+            
+            // Subir nueva imagen a Cloudinary si viene
+            String fotoUrl = null;
+            if (file != null && !file.isEmpty()) {
+                fotoUrl = cloudinaryService.subirImagen(file);
+                
+                // Eliminar la imagen anterior de Cloudinary
+                if (fotoViejaUrl != null && fotoViejaUrl.contains("cloudinary.com")) {
+                    try {
+                        String publicId = cloudinaryService.extraerPublicId(fotoViejaUrl);
+                        if (publicId != null) {
+                            cloudinaryService.eliminarImagen(publicId);
+                        }
+                    } catch (IOException e) {
+                        // Log error pero no fallar la operación
+                        System.err.println("Error al eliminar imagen antigua: " + e.getMessage());
+                    }
+                }
+            }
+            
+            // Convertir cadenas vacías a null
+            String noSerieNormalizado = (noSerie != null && noSerie.trim().isEmpty()) ? null : noSerie;
+            String noInvNormalizado = (noInv != null && noInv.trim().isEmpty()) ? null : noInv;
+            
+            // Crear request
+            ProductoRequest request = new ProductoRequest();
+            request.setIdArea(idArea);
+            request.setIdCategoria(idCategoria);
+            request.setIdMarca(idMarca);
+            request.setNoSerie(noSerieNormalizado);
+            request.setNoInv(noInvNormalizado);
+            request.setIdEstado(idEstado);
+            request.setModelo(modelo);
+            request.setFoto(fotoUrl);
             
             Producto producto = productoService.actualizar(id, request, usuarioActual);
             return ResponseEntity.ok(producto);
@@ -136,7 +219,6 @@ public class ProductoController {
                 .body(new MessageResponse("Error al actualizar producto: " + e.getMessage()));
         }
     }
-    
     @PatchMapping("/{id}/desactivar")
     public ResponseEntity<?> desactivar(@PathVariable Long id, 
                                         @RequestBody ProductoBajaRequest request) {
@@ -172,6 +254,36 @@ public class ProductoController {
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                 .body(new MessageResponse("Error al activar producto: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/upload-imagen")
+    public ResponseEntity<?> uploadImagen(@RequestParam("file") MultipartFile file) {
+        try {
+            // Validar que sea una imagen
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest()
+                    .body(new MessageResponse("El archivo debe ser una imagen"));
+            }
+            
+            // Validar tamaño (máximo 5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest()
+                    .body(new MessageResponse("La imagen no debe superar 5MB"));
+            }
+            
+            // Subir a Cloudinary
+            String imageUrl = cloudinaryService.subirImagen(file);
+            
+            // Retornar la URL
+            Map<String, String> response = new HashMap<>();
+            response.put("url", imageUrl);
+            return ResponseEntity.ok(response);
+            
+        } catch (IOException e) {
+            return ResponseEntity.status(500)
+                .body(new MessageResponse("Error al subir imagen: " + e.getMessage()));
         }
     }
     
